@@ -770,7 +770,7 @@ public final class DownloadProvider extends ContentProvider {
 
                 final AppOpsManager appOps = getContext().getSystemService(AppOpsManager.class);
                 if (appOps.noteProxyOp(AppOpsManager.OP_WRITE_EXTERNAL_STORAGE, getCallingPackage(),
-                        Binder.getCallingUid(), getCallingFeatureId(), null)
+                        Binder.getCallingUid(), getCallingAttributionTag(), null)
                         != AppOpsManager.MODE_ALLOWED) {
                     throw new SecurityException("No permission to write");
                 }
@@ -1091,14 +1091,16 @@ public final class DownloadProvider extends ContentProvider {
         }
 
         final int targetSdkVersion = getCallingPackageTargetSdkVersion();
+        final AppOpsManager appOpsManager = getContext().getSystemService(AppOpsManager.class);
+        final boolean runningLegacyMode = appOpsManager.checkOp(AppOpsManager.OP_LEGACY_STORAGE,
+                Binder.getCallingUid(), getCallingPackage()) == AppOpsManager.MODE_ALLOWED;
 
         if (Helpers.isFilenameValidInExternalPackage(getContext(), file, getCallingPackage())
                 || Helpers.isFilenameValidInKnownPublicDir(file.getAbsolutePath())) {
             // No permissions required for paths belonging to calling package or
             // public downloads dir.
             return;
-        } else if (targetSdkVersion < Build.VERSION_CODES.Q
-                && Helpers.isFilenameValidInExternal(getContext(), file)) {
+        } else if (runningLegacyMode && Helpers.isFilenameValidInExternal(getContext(), file)) {
             // Otherwise we require write permission
             getContext().enforceCallingOrSelfPermission(
                     android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
@@ -1106,7 +1108,7 @@ public final class DownloadProvider extends ContentProvider {
 
             final AppOpsManager appOps = getContext().getSystemService(AppOpsManager.class);
             if (appOps.noteProxyOp(AppOpsManager.OP_WRITE_EXTERNAL_STORAGE, getCallingPackage(),
-                    Binder.getCallingUid(), getCallingFeatureId(), null)
+                    Binder.getCallingUid(), getCallingAttributionTag(), null)
                     != AppOpsManager.MODE_ALLOWED) {
                 throw new SecurityException("No permission to write to " + file);
             }
@@ -1141,12 +1143,12 @@ public final class DownloadProvider extends ContentProvider {
 
         if (Binder.getCallingPid() == Process.myPid()) {
             return;
-        } else if (Helpers.isFilenameValidInExternalPackage(getContext(), file, getCallingPackage())) {
-            // No permissions required for paths belonging to calling package.
+        } else if (Helpers.isFilenameValidInExternalPackage(getContext(), file, getCallingPackage())
+                || Helpers.isFilenameValidInPublicDownloadsDir(file)) {
+            // No permissions required for paths belonging to calling package or
+            // public downloads dir.
             return;
-        } else if ((runningLegacyMode && Helpers.isFilenameValidInPublicDownloadsDir(file))
-                || (targetSdkVersion < Build.VERSION_CODES.Q
-                        && Helpers.isFilenameValidInExternal(getContext(), file))) {
+        } else if (runningLegacyMode && Helpers.isFilenameValidInExternal(getContext(), file)) {
             // Otherwise we require write permission
             getContext().enforceCallingOrSelfPermission(
                     android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
@@ -1154,7 +1156,7 @@ public final class DownloadProvider extends ContentProvider {
 
             final AppOpsManager appOps = getContext().getSystemService(AppOpsManager.class);
             if (appOps.noteProxyOp(AppOpsManager.OP_WRITE_EXTERNAL_STORAGE, getCallingPackage(),
-                    Binder.getCallingUid(), getCallingFeatureId(), null)
+                    Binder.getCallingUid(), getCallingAttributionTag(), null)
                     != AppOpsManager.MODE_ALLOWED) {
                 throw new SecurityException("No permission to write to " + file);
             }
